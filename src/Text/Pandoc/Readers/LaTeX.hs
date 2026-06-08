@@ -1228,35 +1228,35 @@ resolveTikzDimRegisters txt =
       -- Replace remaining bare occurrences (not preceded by a number).
       txt3 = T.replace "\\fw" "\\linewidth" txt2
   in case fhK of
-       Just k  -> T.replace "\\fh" (T.pack (showFl k) <> "\\linewidth") txt3
+       Just k  -> T.replace "\\fh" (showFl k <> "\\linewidth") txt3
        Nothing -> txt3
 
 -- | Extract the multiplier K from \fh=K\linewidth.
 extractFhMultiplier :: Text -> Maybe Double
 extractFhMultiplier txt =
-  case T.breakOn "\\fh=" txt of
-    (_, rest) | T.null rest -> Nothing
-    (_, rest) ->
-      let after = T.drop 4 rest
-          (numStr, _) = T.span (\c -> isDigit c || c == '.') after
-      in safeRead numStr
+  let (_, rest) = T.breakOn "\\fh=" txt
+  in if T.null rest
+     then Nothing
+     else let after = T.drop 4 rest
+              (numStr, _) = T.span (\c -> isDigit c || c == '.') after
+          in safeRead numStr
 
 -- | Replace every occurrence of NUMBER\dim with (NUMBER * mult)\linewidth.
 replaceNumDim :: Text -> Double -> Text -> Text
 replaceNumDim dim mult = go
   where
     go src =
-      case T.breakOn dim src of
-        Nothing -> src
-        Just (pre, post) ->
-          let rest = T.drop (T.length dim) post
-          in if not (T.null pre) && let c = T.last pre
-                                    in isDigit c || c == '.'
-             then let (numStr, prefix) = T.break (\c -> not (isDigit c || c == '.'))
-                                           (T.reverse pre)
-                      n = fromMaybe 1.0 (safeRead (T.reverse numStr)) * mult
-                  in T.reverse prefix <> T.pack (showFl n) <> "\\linewidth" <> go rest
-             else pre <> dim <> go rest
+      let (pre, post) = T.breakOn dim src
+      in if T.null post
+         then src
+         else let rest = T.drop (T.length dim) post
+              in if not (T.null pre) && let c = T.last pre
+                                        in isDigit c || c == '.'
+                 then let (numStr, prefix) = T.break (\c -> not (isDigit c || c == '.'))
+                                               (T.reverse pre)
+                          n = fromMaybe 1.0 (safeRead (T.reverse numStr)) * mult
+                      in T.reverse prefix <> showFl n <> "\\linewidth" <> go rest
+                 else pre <> dim <> go rest
 
 tikzPicture :: PandocMonad m => LP m Blocks
 tikzPicture = do
