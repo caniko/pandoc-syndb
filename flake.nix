@@ -28,8 +28,11 @@
         jailbreakUnbreak = pkg:
           pkgs.haskell.lib.doJailbreak (pkg.overrideAttrs (_: { meta = { }; }));
 
-        # PUT YOUR PACKAGE NAME HERE:
         packageName = "pandoc";
+
+        pandocPackages = haskellPackages.extend (hself: _hsuper: {
+          pandoc = self.packages.${system}.pandoc;
+        });
 
         wasmToolchain = ghc-wasm-meta.packages.${system}.default;
         # Alternatively, if you want a specific "bundle":
@@ -37,6 +40,11 @@
       in {
         packages.${packageName} =
           haskellPackages.callCabal2nix packageName self rec {
+            # Dependency overrides go here
+          };
+
+        packages.pandoc-cli =
+          pandocPackages.callCabal2nix "pandoc-cli" ./pandoc-cli rec {
             # Dependency overrides go here
           };
 

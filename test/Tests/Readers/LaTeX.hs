@@ -54,6 +54,18 @@ tests = [ testGroup "basic"
             "\\emph{emphasized}" =?> para (emph "emphasized")
           ]
 
+        , testGroup "macros"
+          [ "csname command invocation" =:
+            T.unlines [ "\\expandafter\\def\\csname generated\\endcsname{expanded}"
+                      , "\\generated"
+                      ] =?> para "expanded"
+          , "nested csname macro expansion" =:
+            T.unlines [ "\\newcommand{\\figpath}[1]{\\csname synfig@#1\\endcsname}"
+                      , "\\expandafter\\def\\csname synfig@architecture\\endcsname{figures/layouts/CF01_layout}"
+                      , "\\figpath{architecture}"
+                      ] =?> para "figures/layouts/CF01_layout"
+          ]
+
         , testGroup "headers"
           [ "level 1" =:
             "\\section{header}" =?> headerWith ("header",[],[]) 1 "header"
@@ -239,6 +251,22 @@ tests = [ testGroup "basic"
           , "Image with options with spaces" =:
             "\\includegraphics[width=12cm, height = 5cm]{foo.png}" =?>
             para (imageWith ("", [], [("width", "12cm"), ("height", "5cm")]) "foo.png" "" "image")
+          , "SVG image" =:
+            "\\includesvg{foo.svg}" =?>
+            para (image "foo.svg" "" (text "image"))
+          , "TikZ picture extracts image commands" =:
+            "\\begin{tikzpicture}\\node{\\includesvg{foo.svg}};\\end{tikzpicture}" =?>
+            plain (image "foo.svg" "" (text "image"))
+          , "Figure with TikZ image and caption" =:
+            T.unlines [ "\\begin{figure}"
+                      , "\\begin{tikzpicture}\\node{\\includesvg{foo.svg}};\\end{tikzpicture}"
+                      , "\\caption{A caption}"
+                      , "\\label{fig:foo}"
+                      , "\\end{figure}"
+                      ] =?>
+            figureWith ("fig:foo", [], [])
+              (Caption Nothing [Plain [Str "A", Space, Str "caption"]])
+              (plain (image "foo.svg" "" mempty))
           ]
 
         , let hex = ['0'..'9']++['a'..'f'] in
