@@ -1215,11 +1215,55 @@ rawVerbEnv name = do
        report $ SkippedContent raw' pos
        return mempty
 
+-- | Resolve custom TeX dimension registers \fw (= \linewidth) and
+-- \fh (= K * \linewidth) inside tikzpicture raw text before
+-- retokenization.  FigureFit layout files use these registers in
+-- \includesvg[width=0.65\fw, height=0.20\fh]{...} so the Pandoc reader
+-- must convert them to plain \linewidth multiples.
+resolveTikzDimRegisters :: Text -> Text
+resolveTikzDimRegisters txt =
+  let fhK = extractFhMultiplier txt
+      txt1 = replaceNumDim "\\fw" 1.0 txt
+      txt2 = replaceNumDim "\\fh" (fromMaybe 1.0 fhK) txt1
+      -- Replace remaining bare occurrences (not preceded by a number).
+      txt3 = T.replace "\\fw" "\\linewidth" txt2
+  in case fhK of
+       Just k  -> T.replace "\\fh" (T.pack (showFl k) <> "\\linewidth") txt3
+       Nothing -> txt3
+
+-- | Extract the multiplier K from \fh=K\linewidth.
+extractFhMultiplier :: Text -> Maybe Double
+extractFhMultiplier txt =
+  case T.breakOn "\\fh=" txt of
+    (_, rest) | T.null rest -> Nothing
+    (_, rest) ->
+      let after = T.drop 4 rest
+          (numStr, _) = T.span (\c -> isDigit c || c == '.') after
+      in safeRead numStr
+
+-- | Replace every occurrence of NUMBER\dim with (NUMBER * mult)\linewidth.
+replaceNumDim :: Text -> Double -> Text -> Text
+replaceNumDim dim mult = go
+  where
+    go src =
+      case T.breakOn dim src of
+        Nothing -> src
+        Just (pre, post) ->
+          let rest = T.drop (T.length dim) post
+          in if not (T.null pre) && let c = T.last pre
+                                    in isDigit c || c == '.'
+             then let (prefix, numStr) =
+                        T.spanEnd (\c -> isDigit c || c == '.') pre
+                      n = fromMaybe 1.0 (safeRead numStr) * mult
+                  in prefix <> T.pack (showFl n) <> "\\linewidth" <> go rest
+             else pre <> dim <> go rest
+
 tikzPicture :: PandocMonad m => LP m Blocks
 tikzPicture = do
   pos <- getPosition
   raw <- verbEnv "tikzpicture"
-  images <- parseFromToks tikzImages $ tokenize (initialPos "tikzpicture") raw
+  let raw' = resolveTikzDimRegisters raw
+  images <- parseFromToks tikzImages $ tokenize (initialPos "tikzpicture") raw'
   if null images
      then rawVerbFallback pos "tikzpicture" raw
      else return $ mconcat $ map plain images

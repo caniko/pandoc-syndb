@@ -267,6 +267,45 @@ tests = [ testGroup "basic"
             figureWith ("fig:foo", [], [])
               (Caption Nothing [Plain [Str "A", Space, Str "caption"]])
               (plain (image "foo.svg" "" mempty))
+          , "TikZ \\fw dimen register resolves to \\linewidth" =:
+            T.unlines [ "\\begin{tikzpicture}"
+                      , "\\ifdefined\\fw\\else\\newdimen\\fw\\fi \\fw=\\linewidth"
+                      , "\\node{\\includesvg[width=0.5\\fw]{test.svg}};"
+                      , "\\end{tikzpicture}"
+                      ] =?>
+            plain (imageWith ("", [], [("width", "50%")]) "test.svg" "" "image")
+          , "TikZ \\fw and \\fh dimen registers resolve to \\linewidth multiples" =:
+            T.unlines [ "\\begin{tikzpicture}"
+                      , "\\fw=\\linewidth"
+                      , "\\fh=1.5\\linewidth"
+                      , "\\node{\\includesvg[width=0.5\\fw,height=0.5\\fh]{test.svg}};"
+                      , "\\end{tikzpicture}"
+                      ] =?>
+            plain (imageWith ("", [], [("width", "50%"), ("height", "75%")])
+                    "test.svg" "" "image")
+          , "TikZ \\fw/\\fh work inside \\[ ... \\] short-form math" =:
+            T.unlines [ "\\begin{tikzpicture}"
+                      , "\\fw=\\linewidth \\fh=2\\linewidth"
+                      , "\\node{\\includesvg[width=0.3\\fw,height=0.3\\fh]{A}};"
+                      , "\\node{\\includesvg[width=0.6\\fw,height=0.5\\fh]{B}};"
+                      , "\\end{tikzpicture}"
+                      ] =?>
+            mconcat [ plain (imageWith ("", [], [("width", "30%"), ("height", "60%")])
+                              "A" "" "image")
+                    , plain (imageWith ("", [], [("width", "60%"), ("height", "100%")])
+                              "B" "" "image")
+                    ]
+          , "Figure with TikZ \\fw/\\fh images and caption" =:
+            T.unlines [ "\\begin{figure}"
+                      , "\\begin{tikzpicture}\\fw=\\linewidth\\fh=2\\linewidth\\node{\\includesvg[width=1\\fw,height=1\\fh]{fig}};\\end{tikzpicture}"
+                      , "\\caption{A figure}"
+                      , "\\label{fig:test}"
+                      , "\\end{figure}"
+                      ] =?>
+            figureWith ("fig:test", [], [])
+              (Caption Nothing [Plain [Str "A", Space, Str "figure"]])
+              (plain (imageWith ("", [], [("width", "100%"), ("height", "200%")])
+                       "fig" "" mempty))
           ]
 
         , let hex = ['0'..'9']++['a'..'f'] in
