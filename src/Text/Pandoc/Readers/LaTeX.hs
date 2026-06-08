@@ -1252,10 +1252,10 @@ replaceNumDim dim mult = go
           let rest = T.drop (T.length dim) post
           in if not (T.null pre) && let c = T.last pre
                                     in isDigit c || c == '.'
-             then let (prefix, numStr) =
-                        T.spanEnd (\c -> isDigit c || c == '.') pre
-                      n = fromMaybe 1.0 (safeRead numStr) * mult
-                  in prefix <> T.pack (showFl n) <> "\\linewidth" <> go rest
+             then let (numStr, prefix) = T.break (\c -> not (isDigit c || c == '.'))
+                                           (T.reverse pre)
+                      n = fromMaybe 1.0 (safeRead (T.reverse numStr)) * mult
+                  in T.reverse prefix <> T.pack (showFl n) <> "\\linewidth" <> go rest
              else pre <> dim <> go rest
 
 tikzPicture :: PandocMonad m => LP m Blocks
