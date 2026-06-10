@@ -446,7 +446,7 @@ inlineCommands = M.unions
     -- svg
     , ("includesvg",      do options <- option [] keyvals
                              src <- bracedFilename
-                             mkImageWithExts options [".svg", ".png"] . unescapeURL $ src)
+                             mkImageWithExts options [".png", ".svg"] . unescapeURL $ src)
     -- hyperref
     , ("url", (\url -> linkWith ("",["uri"],[]) url "" (str url))
                         . unescapeURL . untokenize <$> bracedUrl)
@@ -1278,7 +1278,7 @@ tikzImage = do
   options <- option [] keyvals
   src <- bracedFilename
   case name of
-    "includesvg" -> mkImageWithExts options [".svg", ".png"] . unescapeURL $ src
+    "includesvg" -> mkImageWithExts options [".png", ".svg"] . unescapeURL $ src
     _            -> mkImage options . unescapeURL $ src
 
 rawVerbFallback pos name raw = do

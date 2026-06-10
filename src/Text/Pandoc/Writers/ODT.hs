@@ -313,6 +313,18 @@ transformPicMath opts (Image attr@(id', cls, _) lab (src,t)) = catchError
                          return (100, 100)
        let dims =
              case (getDim Width, getDim Height) of
+               -- Both percentages (\linewidth fractions from the LaTeX
+               -- reader) describe the panel's allocation box.  LaTeX's
+               -- \includesvg[width,height] FITS the image inside that box
+               -- preserving aspect ratio, whereas an ODT frame stretches
+               -- its bitmap -- so precompute the fitted size here.
+               (Just (Percent wp), Just (Percent hp)) ->
+                 let imgRatio = ptX / ptY
+                     boxRatio = wp / hp
+                     (w', h') = if imgRatio >= boxRatio
+                                   then (wp, wp / imgRatio)
+                                   else (hp * imgRatio, hp)
+                 in [("width", tshow (Percent w')), ("height", tshow (Percent h'))]
                (Just w, Just h)              -> [("width", tshow w), ("height", tshow h)]
                (Just w@(Percent _), Nothing) -> [("rel-width", tshow w),("rel-height", "scale"),("width", tshow ptX <> "pt"),("height", tshow ptY <> "pt")]
                (Nothing, Just h@(Percent _)) -> [("rel-width", "scale"),("rel-height", tshow h),("width", tshow ptX <> "pt"),("height", tshow ptY <> "pt")]

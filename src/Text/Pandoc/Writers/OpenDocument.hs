@@ -34,7 +34,9 @@ import qualified Text.Pandoc.Builder as B
 import Text.Pandoc.Logging
 import Text.Pandoc.Options
 import Text.DocLayout hiding (link)
-import Text.Pandoc.Shared (linesToPara, tshow, blocksToInlines)
+import Data.Maybe (fromMaybe)
+import Text.DocTemplates (lookupContext)
+import Text.Pandoc.Shared (linesToPara, tshow, blocksToInlines, safeRead)
 import Text.Pandoc.Templates (renderTemplate)
 import qualified Text.Pandoc.Translations as Term (Term(Figure, Table))
 import Text.Pandoc.Walk
@@ -741,14 +743,32 @@ inlineToOpenDocument o ils
       mkImg (_, _, kvs) s _ = do
                id' <- gets stImageId
                modify (\st -> st{ stImageId = id' + 1 })
+               -- Percentage dimensions (produced by the LaTeX reader for
+               -- \linewidth-relative sizes) are not valid svg:width/svg:height
+               -- lengths in ODF, and consumers like ONLYOFFICE refuse to size
+               -- such frames.  Resolve them against the document text width
+               -- (variable image-text-width-mm, default 160mm = A4 with 25mm
+               -- margins).  Both width and height percentages are \linewidth
+               -- multiples, so both resolve against the text WIDTH.
+               let textWidthMM :: Double
+                   textWidthMM = fromMaybe 160 $
+                     lookupContext "image-text-width-mm" (writerVariables o)
+                       >>= safeRead
+                   toAbsLength v =
+                     case T.stripSuffix "%" v >>= safeRead of
+                       Just pct -> T.pack $
+                         printf "%.2fmm" (pct / 100 * textWidthMM :: Double)
+                       Nothing  -> v
                let getDims [] = []
-                   getDims (("width", w) :xs) = ("svg:width", w)  : getDims xs
+                   getDims (("width", w) :xs) = ("svg:width", toAbsLength w)  : getDims xs
                    getDims (("rel-width", w):xs) = ("style:rel-width", w) : getDims xs
-                   getDims (("height", h):xs) = ("svg:height", h) : getDims xs
+                   getDims (("height", h):xs) = ("svg:height", toAbsLength h) : getDims xs
                    getDims (("rel-height", w):xs) = ("style:rel-height", w) : getDims xs
                    getDims (_:xs) =                             getDims xs
                return $ inTags False "draw:frame"
-                        (("draw:name", "img" <> tshow id') : getDims kvs) $
+                        (("draw:name", "img" <> tshow id')
+                         : ("text:anchor-type", "as-char")
+                         : getDims kvs) $
                      selfClosingTag "draw:image" [ ("xlink:href"   , s       )
                                                  , ("xlink:type"   , "simple")
                                                  , ("xlink:show"   , "embed" )
