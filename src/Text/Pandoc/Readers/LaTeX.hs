@@ -28,6 +28,7 @@ import Data.Containers.ListUtils (nubOrd)
 import Data.Char (isDigit, isLetter, isAlphaNum, toUpper, chr)
 import Data.Default
 import Data.List (intercalate)
+import qualified Data.List as L (intersperse)
 import qualified Data.Map as M
 import Data.Maybe (catMaybes, fromMaybe, maybeToList)
 import qualified Data.Set as Set
@@ -1266,7 +1267,10 @@ tikzPicture = do
   images <- parseFromToks tikzImages $ tokenize (initialPos "tikzpicture") raw'
   if null images
      then rawVerbFallback pos "tikzpicture" raw
-     else return $ mconcat $ map plain images
+     -- One paragraph for the whole picture: inline images flow and wrap
+     -- into rows, approximating the FigureFit grid.  One paragraph per
+     -- image would stack every panel vertically.
+     else return $ plain $ mconcat $ L.intersperse B.space images
 
 tikzImages :: PandocMonad m => LP m [Inlines]
 tikzImages =
